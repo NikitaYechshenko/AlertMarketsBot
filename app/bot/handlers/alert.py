@@ -139,20 +139,17 @@ async def reply_my_alerts(message: Message, session: AsyncSession, state: FSMCon
     )
 
     if not alerts:
-        await message.answer(f"🔕 You have no active alerts.\n\n"
-                        f"Press ➕ New Alert to create your first one")
-
-    #     await message.answer(
-    #         t("no_alerts", lang),
-    #         reply_markup=get_empty_alerts_keyboard(lang),
-    #         parse_mode="HTML"
-    #     )
-    # else:
-    #     await message.answer(
-    #         t("alerts_header", lang, count=len(alerts)),
-    #         reply_markup=get_alerts_list_keyboard(alerts, lang),
-    #         parse_mode="HTML"
-    #     )
+        await message.answer(
+            t("no_alerts", lang),
+            reply_markup=get_empty_alerts_keyboard(lang),
+            parse_mode="HTML"
+        )
+    else:
+        await message.answer(
+            t("alerts_header", lang, count=len(alerts)),
+            reply_markup=get_alerts_list_keyboard(alerts, lang),
+            parse_mode="HTML"
+        )
 
 
 @alert.message(F.text.in_(all_langs("btn_new_alert")))

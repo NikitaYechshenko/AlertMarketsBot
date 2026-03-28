@@ -15,6 +15,7 @@ from app.workers.Binance.futures import binance_futures_worker
 from app.core.globals import AVAILABLE_COINS
 # Import Routers
 from app.bot.handlers.alert import alert
+# Note: user.py router is not included; user registration is handled in alert router
 
 
 bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)

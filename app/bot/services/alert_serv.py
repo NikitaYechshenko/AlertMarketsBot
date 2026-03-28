@@ -143,7 +143,7 @@ async def delete_alert(alert_id: int, session: AsyncSession):
     # Remove from Redis
     redis_key = f"alerts:{alert_obj.exchange}:{alert_obj.symbol}"
     try:
-        # Get all alerts from this key
+        # Get all alerts from this key and find the one to delete
         all_alerts = await redis_client.lrange(redis_key, 0, -1)
         for alert_json in all_alerts:
             alert_data = json.loads(alert_json)
@@ -154,7 +154,7 @@ async def delete_alert(alert_id: int, session: AsyncSession):
     except Exception as e:
         logger.error(f"Error removing alert {alert_id} from Redis: {e}")
 
-    # Delete from database (or mark as inactive)
+    # Delete from database (physically remove the record)
     await session.execute(
         delete(Alert).where(Alert.id == alert_id)
     )

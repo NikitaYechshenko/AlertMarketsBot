@@ -1,7 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
-from sqlalchemy import select , delete, update
-from sqlalchemy.future import select
+from sqlalchemy import select, delete, update
 from app.core.redis_db import redis_client
 from aiogram.types import Message
 
