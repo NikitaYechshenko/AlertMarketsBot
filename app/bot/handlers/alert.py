@@ -61,6 +61,54 @@ def calculate_percentage_diff(current: float, target: float) -> float:
     return ((target - current) / current) * 100
 
 
+def parse_price_input(text: str, current_price: float) -> float:
+    """
+    Parse user input and return calculated target price.
+    Supports absolute prices and percentage changes.
+
+    Formats:
+    - Absolute: "65000", "0.5", "$65,000.50"
+    - Percent: "-5%", "+20%", "-5", "+20"
+
+    Returns:
+        target_price: calculated price
+
+    Raises ValueError if input is invalid.
+    """
+    # Clean input
+    clean = text.strip().replace(" ", "").replace("$", "").replace("%", "")
+
+    if not clean:
+        raise ValueError("Empty input")
+
+    # Check if it's percentage (has +/- sign or starts with one)
+    is_percent = clean[0] in "+-" or ("+" in clean or "-" in clean[1:])
+
+    try:
+        if is_percent or (clean[0] in "+-"):
+            # Parse as percentage
+            percent_value = float(clean)
+
+            # Validate range: -99 to +99
+            if percent_value < -99 or percent_value > 99:
+                raise ValueError("Percentage must be between -99% and +99%")
+
+            # Calculate target price
+            target_price = current_price * (1 + percent_value / 100)
+            return target_price
+        else:
+            # Parse as absolute price
+            target_price = float(clean)
+
+            # Validate it's positive
+            if target_price <= 0:
+                raise ValueError("Price must be positive")
+
+            return target_price
+    except ValueError:
+        raise ValueError("Invalid price format")
+
+
 async def get_user_lang(telegram_id: int) -> str:
     """Get user language from Redis, default to 'en'."""
     lang = await redis_client.get(f"lang:{telegram_id}")
@@ -521,11 +569,15 @@ async def process_price(message: Message, state: FSMContext, session: AsyncSessi
         )
         return
 
-    clean_text = message.text.replace(",", ".").replace(" ", "").replace("$", "")
+    # Get current state data first (to access current_price for percent calculations)
+    data = await state.get_data()
+    symbol = data.get("chosen_symbol")
+    exchange = data.get("exchange")
+    current_price = data.get("current_price")
+
+    # Parse user input - supports both absolute prices and percentages
     try:
-        target_price = float(clean_text)
-        if target_price <= 0:
-            raise ValueError("Price must be positive.")
+        target_price = parse_price_input(message.text, current_price)
     except ValueError:
         await message.answer(
             t("alert_price_invalid", lang),
@@ -533,11 +585,6 @@ async def process_price(message: Message, state: FSMContext, session: AsyncSessi
             parse_mode="HTML"
         )
         return
-
-    data = await state.get_data()
-    symbol = data.get("chosen_symbol")
-    exchange = data.get("exchange")
-    current_price = data.get("current_price")
 
     direction = "ABOVE" if target_price > current_price else "BELOW"
 

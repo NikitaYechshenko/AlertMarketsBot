@@ -78,8 +78,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎯 <b>Укажите цену</b> — Шаг 3/3\n\n"
             "<b>{symbol}</b> • {exchange}\n"
             "Текущая цена: <code>${current_price}</code>\n\n"
-            "Введите целевую цену:\n"
-            "<i>Пример: 65000 или 0.5</i>"
+            "Введите цену или % изменение:\n"
+            "<i>Цена: 65000 | 0.5 | Процент: -5% | +20%</i>"
         ),
         "alert_symbol_not_found": (
             "❌ <b>Не найдено</b>\n\n"
@@ -87,9 +87,9 @@ TEXTS: dict[str, dict[str, str]] = {
             "Попробуйте: BTC, ETH, SOL"
         ),
         "alert_price_invalid": (
-            "❌ <b>Некорректная цена</b>\n\n"
-            "Введите число:\n"
-            "<code>65000</code> или <code>0.5</code>"
+            "❌ <b>Некорректный формат</b>\n\n"
+            "Введите цену или процент:\n"
+            "<code>65000</code> | <code>-5%</code> | <code>+20%</code>"
         ),
 
         # Alert created
@@ -227,8 +227,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "🎯 <b>Set Target</b> — Step 3/3\n\n"
             "<b>{symbol}</b> • {exchange}\n"
             "Current: <code>${current_price}</code>\n\n"
-            "Enter your target price:\n"
-            "<i>Example: 65000 or 0.5</i>"
+            "Enter price or % change:\n"
+            "<i>Price: 65000 | 0.5 | Percent: -5% | +20%</i>"
         ),
         "alert_symbol_not_found": (
             "❌ <b>Not found</b>\n\n"
@@ -236,9 +236,9 @@ TEXTS: dict[str, dict[str, str]] = {
             "Try: BTC, ETH, SOL"
         ),
         "alert_price_invalid": (
-            "❌ <b>Invalid price</b>\n\n"
-            "Enter a valid number:\n"
-            "<code>65000</code> or <code>0.5</code>"
+            "❌ <b>Invalid format</b>\n\n"
+            "Enter price or percentage:\n"
+            "<code>65000</code> | <code>-5%</code> | <code>+20%</code>"
         ),
 
         # Alert created
