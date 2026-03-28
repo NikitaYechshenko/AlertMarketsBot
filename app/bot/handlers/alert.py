@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
-from app.bot.states.states import CreateAlert, CreatePercentAlert
+from app.bot.states.states import CreateAlert
 from app.bot.i18n import t, all_langs
 from app.bot.keyboards import (
     MenuCallback,
@@ -213,20 +213,6 @@ async def reply_new_alert(message: Message, state: FSMContext):
         reply_markup=get_cancel_reply_keyboard(lang),
         parse_mode="HTML"
     )
-
-
-@alert.message(F.text.in_(all_langs("btn_percent")))
-async def reply_percent_alert(message: Message, state: FSMContext):
-    """Handle Percentage Alert button from reply keyboard."""
-    lang = await get_user_lang(message.from_user.id)
-    await state.set_state(CreatePercentAlert.waiting_for_symbol)
-
-    await message.answer(
-        t("percent_coming_soon", lang),
-        reply_markup=get_main_reply_keyboard(lang),
-        parse_mode="HTML"
-    )
-    await state.clear()
 
 
 @alert.message(F.text.in_(all_langs("btn_about")))

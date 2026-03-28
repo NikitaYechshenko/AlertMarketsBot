@@ -44,8 +44,8 @@ def get_main_reply_keyboard(lang: str = "en") -> ReplyKeyboardMarkup:
         KeyboardButton(text=t("btn_new_alert", lang))
     )
     builder.row(
-        KeyboardButton(text=t("btn_percent", lang)),
-        KeyboardButton(text=t("btn_settings", lang))
+        KeyboardButton(text=t("btn_settings", lang)),
+        KeyboardButton(text=t("btn_about", lang))
     )
 
     return builder.as_markup(resize_keyboard=True, is_persistent=True)
@@ -67,7 +67,7 @@ def get_cancel_reply_keyboard(lang: str = "en") -> ReplyKeyboardMarkup:
 # ═══════════════════════════════════════════════════════════════════
 
 def get_main_menu(lang: str = "en") -> InlineKeyboardMarkup:
-    """Modern main menu with 4 options."""
+    """Modern main menu with options."""
     builder = InlineKeyboardBuilder()
 
     builder.row(
@@ -82,12 +82,12 @@ def get_main_menu(lang: str = "en") -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(
-            text=t("btn_percent", lang),
-            callback_data=MenuCallback(action="percent_alert").pack()
-        ),
-        InlineKeyboardButton(
             text=t("btn_about", lang),
             callback_data=MenuCallback(action="about").pack()
+        ),
+        InlineKeyboardButton(
+            text=t("btn_lang", lang),
+            callback_data=MenuCallback(action="language").pack()
         )
     )
 
