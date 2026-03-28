@@ -61,9 +61,9 @@ async def post_alert_to_database(user_id: int,
 
 # 4. Push alert to Redis for fast worker access
 async def put_alert_in_redis(user_id: int,
-                             telegram_id: int, 
-                             symbol: str, 
-                             exchange: str, 
+                             telegram_id: int,
+                             symbol: str,
+                             exchange: str,
                              target_price: float,
                              direction: str,
                              alert_id: int):
@@ -74,14 +74,56 @@ async def put_alert_in_redis(user_id: int,
         "symbol": symbol,
         "exchange": exchange,
         # Cast to float in case SQLAlchemy returns a Decimal object
-        "target_price": float(target_price), 
+        "target_price": float(target_price),
         "direction": direction,
     }
-    
+
     redis_key = f"alerts:{exchange}:{symbol}"
     json_data = json.dumps(alert_data)
     await redis_client.rpush(redis_key, json_data)
 
+
+# 5. LOAD ALL ALERTS FROM DB TO REDIS ON STARTUP
+async def load_all_alerts_to_redis(session_maker):
+    """Load all active alerts from database into Redis on bot startup."""
+    try:
+        async with session_maker() as session:
+            # Get all active alerts from database
+            result = await session.execute(
+                select(Alert).where(Alert.is_active == True)
+            )
+            alerts = result.scalars().all()
+
+            loaded_count = 0
+            for alert in alerts:
+                # Get the associated user to retrieve telegram_id
+                user_result = await session.execute(
+                    select(User).where(User.id == alert.user_id)
+                )
+                user = user_result.scalar_one_or_none()
+
+                if not user:
+                    logger.warning(f"Alert {alert.id} has no associated user (user_id: {alert.user_id}). Skipping.")
+                    continue
+
+                try:
+                    await put_alert_in_redis(
+                        user_id=user.id,
+                        telegram_id=user.telegram_id,
+                        symbol=alert.symbol,
+                        exchange=alert.exchange,
+                        target_price=alert.target_price,
+                        direction=alert.direction,
+                        alert_id=alert.id
+                    )
+                    loaded_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to load alert {alert.id} to Redis: {e}")
+                    continue
+
+            logger.success(f"Loaded {loaded_count} active alerts from database to Redis")
+    except Exception as e:
+        logger.error(f"Error loading alerts from database to Redis: {e}")
 
 
 # ALERT TRIGERED - DISABLE IN DB

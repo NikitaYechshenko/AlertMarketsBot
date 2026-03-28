@@ -16,6 +16,8 @@ from app.core.globals import AVAILABLE_COINS
 # Import Routers
 from app.bot.handlers.alert import alert
 # Note: user.py router is not included; user registration is handled in alert router
+# Import alert services
+from app.bot.services.alert_serv import load_all_alerts_to_redis
 
 
 bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
@@ -26,6 +28,8 @@ async def on_startup():
     logger.info("Bot is starting up...")
     logger.info("Initializing redis...")
     await init_redis()
+    logger.info("Loading active alerts from database to Redis...")
+    await load_all_alerts_to_redis(async_session_maker)
     logger.info("Fetching available coins from exchanges...")
     AVAILABLE_COINS["binance_futures"] = set(await check_binance_f())
     AVAILABLE_COINS["binance_spot"] = set(await check_binance_spot())
