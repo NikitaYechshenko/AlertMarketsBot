@@ -75,17 +75,19 @@ def parse_price_input(text: str, current_price: float) -> float:
 
     Raises ValueError if input is invalid.
     """
-    # Clean input
-    clean = text.strip().replace(" ", "").replace("$", "").replace("%", "")
+    original_text = text.strip()
+
+    # Check if it's percentage (contains % symbol or starts with +/-)
+    is_percent = "%" in original_text or (original_text and original_text[0] in "+-")
+
+    # Clean input: remove spaces, $, %, and commas (thousand separators)
+    clean = original_text.replace(" ", "").replace("$", "").replace("%", "").replace(",", "")
 
     if not clean:
         raise ValueError("Empty input")
 
-    # Check if it's percentage (has +/- sign or starts with one)
-    is_percent = clean[0] in "+-" or ("+" in clean or "-" in clean[1:])
-
     try:
-        if is_percent or (clean[0] in "+-"):
+        if is_percent:
             # Parse as percentage
             percent_value = float(clean)
 
