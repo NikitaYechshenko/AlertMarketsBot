@@ -136,22 +136,8 @@ def get_alerts_list_keyboard(alerts: list, lang: str = "en") -> InlineKeyboardMa
 
 
 def get_empty_alerts_keyboard(lang: str = "en") -> InlineKeyboardMarkup:
-    """Keyboard when user has no alerts."""
+    """Keyboard when user has no alerts - empty (no buttons)."""
     builder = InlineKeyboardBuilder()
-
-    builder.row(
-        InlineKeyboardButton(
-            text=t("btn_create_first", lang),
-            callback_data=MenuCallback(action="new_alert").pack()
-        )
-    )
-    builder.row(
-        InlineKeyboardButton(
-            text=t("btn_back_menu", lang),
-            callback_data=MenuCallback(action="main_menu").pack()
-        )
-    )
-
     return builder.as_markup()
 
 
