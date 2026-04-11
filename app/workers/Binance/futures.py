@@ -6,7 +6,7 @@ import json
 import asyncio
 from aiogram import Bot
 import aiohttp
-
+from app.core.config import settings
 
 def _log_task_exception(task: asyncio.Task) -> None:
     try:
@@ -124,7 +124,7 @@ async def binance_futures_worker(bot: Bot):
                             # Binance sends a list of dictionaries.
                             if not data:
                                 logger.error("Received empty data from spot WS")
-                                await bot.send_message(chat_id=919021657, text="Received empty data from spot WS")  # Replace with actual chat ID
+                                await bot.send_message(chat_id=settings.CHAT_ID, text="Received empty data from spot WS")  # Replace with actual chat ID
                                 break
 
                             # Binance sends a list of dictionaries.

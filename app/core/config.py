@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Telegram
     TELEGRAM_BOT_TOKEN: str
-
+    CHAT_ID: int
     @computed_field
     @property
     def DATABASE_URL(self) -> str:
