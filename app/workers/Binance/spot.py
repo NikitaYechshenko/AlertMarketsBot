@@ -1,99 +1,161 @@
-
 from app.core.redis_db import redis_client
 from app.bot.services.alert_serv import send_alert_message, disable_alert_in_db
 from app.core.database import async_session_maker
-import loguru
+from loguru import logger
 import json
 import asyncio
 from aiogram import Bot
 import aiohttp
 
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    try:
+        task.result()
+    except Exception as e:
+        logger.error(f"Alert check task failed: {e}")
+
+
 async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
     """
-    Проверяет, есть ли сработавшие алерты для конкретной монеты.
+    Check if there are any triggered alerts for a specific coin.
     """
     exchange = "binance_spot"
     redis_key = f"alerts:{exchange}:{symbol}"
-    
-    # Получаем все алерты по этой монете из списка в Redis
-    # lrange вернет пустой список [], если алертов на эту монету нет
+
+    # Get all alerts for this coin from Redis list
+    # lrange returns empty list [] if no alerts for this coin
     alerts = await redis_client.lrange(redis_key, 0, -1)
-    
+
     if not alerts:
-        return # Если алертов нет, сразу выходим (экономим ресурсы)
+        return  # If no alerts, exit early (save resources)
 
     for alert_str in alerts:
-        # alert_str приходит в виде байт-строки или строки (зависит от настроек Redis)
-        alert_data = json.loads(alert_str)
+        if isinstance(alert_str, bytes):
+            try:
+                alert_str = alert_str.decode("utf-8")
+            except UnicodeDecodeError as e:
+                logger.error(f"Invalid alert encoding for {symbol}: {e}")
+                continue
+
+        # alert_str comes as bytes or string (depends on Redis settings)
+        try:
+            alert_data = json.loads(alert_str)
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid alert JSON for {symbol}: {e}")
+            continue
+
+        target_price = alert_data.get("target_price")
+        direction = alert_data.get("direction")
+        telegram_id = alert_data.get("telegram_id")
+        alert_id = alert_data.get("alert_id")
         
-        target_price = alert_data["target_price"]
-        direction = alert_data["direction"]
-        telegram_id = alert_data["telegram_id"]
-        alert_id = alert_data["alert_id"]
-        
+        # Type conversion for target_price
+        try:
+            target_price = float(target_price) if target_price is not None else None
+        except (TypeError, ValueError):
+            logger.error(f"Invalid target_price for alert {alert_id}: {target_price}")
+            # Remove malformed alert from Redis to prevent infinite loop
+            await redis_client.lrem(redis_key, 1, alert_str)
+            continue
+            
+        if (
+            target_price is None
+            or direction not in {"ABOVE", "BELOW"}
+            or telegram_id is None
+            or alert_id is None
+        ):
+            logger.error(f"Incomplete alert payload for {symbol}: {alert_data}")
+            # Remove malformed alert from Redis to prevent infinite loop
+            await redis_client.lrem(redis_key, 1, alert_str)
+            continue
         triggered = False
-        
-        # Логика срабатывания
+
+        # Trigger logic
         if direction == "ABOVE" and current_price >= target_price:
             triggered = True
         elif direction == "BELOW" and current_price <= target_price:
             triggered = True
-            
+
         if triggered:
-
-            # 1. Отправляем сообщение пользователю
-            await send_alert_message(bot, telegram_id, current_price, symbol, exchange, target_price)
-
-            # 2. Удаляем именно ЭТОТ сработавший алерт из списка Redis
-            # lrem(key, count, value) - удаляет 1 вхождение строки alert_str
-            await redis_client.lrem(redis_key, 1, alert_str)
-            
-            # 3. (Опционально) Меняем статус алерта в PostgreSQL на is_active=False
             try:
+                logger.info(
+                    f"Alert {alert_id} triggered for {symbol} at price {current_price}. Target was {direction} {target_price}. Telegram ID: {telegram_id}"
+                )
                 async with async_session_maker() as session:
-                    await disable_alert_in_db(alert_id, session)
+                    was_disabled = await disable_alert_in_db(alert_id, session)
+                
+                # Always send message and cleanup Redis, regardless of DB state
+                # This ensures we don't get stuck with stale Redis entries
+                try:
+                    await send_alert_message(
+                        bot, telegram_id, current_price, symbol, exchange, target_price
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send alert message: {e}")
+                
+                # Always cleanup Redis (even if DB update failed or message failed)
+                await redis_client.lrem(redis_key, 1, alert_str)
+                
+                if not was_disabled:
+                    logger.warning(f"Alert {alert_id} was already inactive, but removed from Redis cache")
             except Exception as e:
-                loguru.logger.error(f"Failed to disable alert in database: {e}")
+                logger.error(f"Failed to process triggered alert {alert_id}: {e}")
 
 
 async def binance_spot_worker(bot: Bot):
     """
-    Фоновый процесс, который держит WebSocket соединение с Binance Spot.
+    Background process that maintains WebSocket connection with Binance Spot.
     """
-    # Эндпоинт стрима всех тикеров (All Market Tickers Stream)
-    url = "wss://stream.binance.com/ws/!ticker@arr" # CHANGE
-    
-    while True: # Бесконечный цикл для авто-переподключения при ошибках
+    # Endpoint for all tickers stream (All Market Tickers Stream)
+    url = "wss://stream.binance.com/ws/!miniTicker@arr"
+
+    while True:  # Infinite loop for auto-reconnect on errors
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(url) as ws:
-                    loguru.logger.info("🟢 Успешно подключились к WebSocket Binance Spot!")
-                    
+                    logger.info("🟢 Успешно подключились к WebSocket Binance Spot!")
+
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
-                            data = json.loads(msg.data)
-                            
-                            # Binance присылает список словарей. 
+                            try:
+                                data = json.loads(msg.data)
+                            except json.JSONDecodeError as e:
+                                logger.error(f"Invalid spot WS JSON: {e}")
+                                continue
+                            # Binance sends a list of dictionaries.
+                            if not data:
+                                logger.error("Received empty data from spot WS")
+                                await bot.send_message(chat_id=919021657, text="Received empty data from spot WS")  # Replace with actual chat ID
+                                break
+                                                        # Binance sends a list of dictionaries.
                             # 's' - symbol (BTCUSDT), 'c' - current close price
                             for item in data:
-                                symbol = item['s']
-                                current_price = float(item['c'])
-                                
-                                # Запускаем проверку (без await перед asyncio.create_task, 
-                                # чтобы проверка шла параллельно и не тормозила чтение вебсокета)
-                                asyncio.create_task(
+                                symbol = item.get("s")
+                                raw_price = item.get("c")
+                                if symbol is None or raw_price is None:
+                                    continue
+                                try:
+                                    current_price = float(raw_price)
+                                except (TypeError, ValueError):
+                                    continue
+
+                                # Start check without await for asyncio.create_task,
+                                # so check runs in parallel and doesn't block websocket reading
+                                task = asyncio.create_task(
                                     check_alerts_for_symbol(symbol, current_price, bot)
                                 )
-                                
+                                task.add_done_callback(_log_task_exception)
+
                         elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            loguru.logger.warning("🔴 WebSocket SPOT закрыт биржей.")
+                            logger.warning("🔴 WebSocket SPOT закрыт биржей.")
                             break
                         elif msg.type == aiohttp.WSMsgType.ERROR:
-                            loguru.logger.error("🔴 Ошибка WebSocket SPOT .")
+                            logger.error("🔴 Ошибка WebSocket SPOT .")
                             break
-                            
+                        
+
         except Exception as e:
-            loguru.logger.error(f"⚠️ Ошибка соединения в Binance Spot Worker: {e}. Переподключение через 5 секунд...")
-            await asyncio.sleep(5) # Пауза перед попыткой переподключиться
-
-
+            logger.error(
+                f"⚠️ Ошибка соединения в Binance Spot Worker: {e}. Переподключение через 5 секунд..."
+            )
+            await asyncio.sleep(5)  # Pause before reconnection attempt

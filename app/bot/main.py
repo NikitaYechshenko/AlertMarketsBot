@@ -24,6 +24,13 @@ bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
 
 
+def _log_worker_task_failure(task: asyncio.Task) -> None:
+    try:
+        task.result()
+    except Exception as e:
+        logger.error(f"Worker task failed: {e}")
+
+
 async def on_startup():
     logger.info("Bot is starting up...")
     logger.info("Initializing redis...")
@@ -34,8 +41,10 @@ async def on_startup():
     AVAILABLE_COINS["binance_futures"] = set(await check_binance_f())
     AVAILABLE_COINS["binance_spot"] = set(await check_binance_spot())
     # Start workers for each exchange
-    asyncio.create_task(binance_spot_worker(bot))
-    asyncio.create_task(binance_futures_worker(bot))
+    spot_task = asyncio.create_task(binance_spot_worker(bot))
+    futures_task = asyncio.create_task(binance_futures_worker(bot))
+    spot_task.add_done_callback(_log_worker_task_failure)
+    futures_task.add_done_callback(_log_worker_task_failure)
     logger.info("Bot startup complete!")
 
 

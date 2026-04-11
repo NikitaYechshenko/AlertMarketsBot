@@ -7,9 +7,10 @@ WORKDIR /app
 
 # Копируем requirements из app/ и весь код
 COPY app/requirements.txt .
-COPY app . .
-
 # Устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app . .
+
 
 CMD ["python", "-m", "app.bot.main"]

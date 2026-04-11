@@ -8,6 +8,7 @@ from sqlalchemy import desc, update, delete, select
 from aiogram import Bot
 from app.models.user import User
 
+
 # 1. Search where the asset is traded
 async def find_exchanges_for_symbol(symbol: str) -> list[dict]:
     exchanges = []
@@ -15,11 +16,14 @@ async def find_exchanges_for_symbol(symbol: str) -> list[dict]:
         if symbol in coins:
             # Formatting the name for UI (e.g., "binance_futures" -> "Binance Futures")
             display_name = exchange_name.replace("_", " ").title()
-            exchanges.append({
-                "name": display_name, 
-                "data": exchange_name, 
-            })
+            exchanges.append(
+                {
+                    "name": display_name,
+                    "data": exchange_name,
+                }
+            )
     return exchanges
+
 
 # 2. Get current price from exchanges
 async def get_current_price(symbol: str, exchange: str) -> float:
@@ -27,18 +31,19 @@ async def get_current_price(symbol: str, exchange: str) -> float:
     if not fetch_func:
         raise ValueError(f"Unknown exchange: {exchange}")
     return await fetch_func(symbol)
- 
+
+
 # 3. Save alert to PostgreSQL
-async def post_alert_to_database(user_id: int,
-                                 symbol: str,
-                                 exchange: str,
-                                 direction: str,
-                                 target_price: float,
-                                 session: AsyncSession) -> Alert:
+async def post_alert_to_database(
+    user_id: int,
+    symbol: str,
+    exchange: str,
+    direction: str,
+    target_price: float,
+    session: AsyncSession,
+) -> Alert:
     # Check if user exists
-    user_exists = await session.execute(
-        select(User).where(User.id == user_id)
-    )
+    user_exists = await session.execute(select(User).where(User.id == user_id))
     if not user_exists.scalar_one_or_none():
         raise ValueError(f"User with id {user_id} does not exist")
 
@@ -51,7 +56,7 @@ async def post_alert_to_database(user_id: int,
         symbol=symbol,
         exchange=exchange,
         direction=direction,
-        target_price=target_price
+        target_price=target_price,
     )
     session.add(new_alert)
     await session.commit()
@@ -59,14 +64,17 @@ async def post_alert_to_database(user_id: int,
 
     return new_alert
 
+
 # 4. Push alert to Redis for fast worker access
-async def put_alert_in_redis(user_id: int,
-                             telegram_id: int,
-                             symbol: str,
-                             exchange: str,
-                             target_price: float,
-                             direction: str,
-                             alert_id: int):
+async def put_alert_in_redis(
+    user_id: int,
+    telegram_id: int,
+    symbol: str,
+    exchange: str,
+    target_price: float,
+    direction: str,
+    alert_id: int,
+):
     alert_data = {
         "alert_id": alert_id,
         "user_id": user_id,
@@ -89,9 +97,7 @@ async def load_all_alerts_to_redis(session_maker):
     try:
         async with session_maker() as session:
             # Get all active alerts from database
-            result = await session.execute(
-                select(Alert).where(Alert.is_active == True)
-            )
+            result = await session.execute(select(Alert).where(Alert.is_active == True))
             alerts = result.scalars().all()
 
             loaded_count = 0
@@ -103,7 +109,9 @@ async def load_all_alerts_to_redis(session_maker):
                 user = user_result.scalar_one_or_none()
 
                 if not user:
-                    logger.warning(f"Alert {alert.id} has no associated user (user_id: {alert.user_id}). Skipping.")
+                    logger.warning(
+                        f"Alert {alert.id} has no associated user (user_id: {alert.user_id}). Skipping."
+                    )
                     continue
 
                 try:
@@ -114,37 +122,43 @@ async def load_all_alerts_to_redis(session_maker):
                         exchange=alert.exchange,
                         target_price=alert.target_price,
                         direction=alert.direction,
-                        alert_id=alert.id
+                        alert_id=alert.id,
                     )
                     loaded_count += 1
                 except Exception as e:
                     logger.error(f"Failed to load alert {alert.id} to Redis: {e}")
                     continue
 
-            logger.success(f"Loaded {loaded_count} active alerts from database to Redis")
+            logger.success(
+                f"Loaded {loaded_count} active alerts from database to Redis"
+            )
     except Exception as e:
         logger.error(f"Error loading alerts from database to Redis: {e}")
 
 
 # ALERT TRIGERED - DISABLE IN DB
 
-async def disable_alert_in_db(alert_id: int, session: AsyncSession):
+
+async def disable_alert_in_db(alert_id: int, session: AsyncSession) -> bool:
     result = await session.execute(
         update(Alert)
-        .where(Alert.id == alert_id)
+        .where(Alert.id == alert_id, Alert.is_active == True)
         .values(is_active=False)
     )
     await session.commit()
-    logger.info(f"Alert {alert_id} disabled in database.")
+    updated_rows = result.rowcount or 0
+    if updated_rows:
+        logger.info(f"Alert {alert_id} disabled in database.")
+        return True
 
+    logger.warning(f"Alert {alert_id} is already inactive or missing.")
+    return False
 
 
 # --- VIEW ACTIVE ALERTS ---
 async def get_all_active_alerts(telegram_id: int, session: AsyncSession):
     """Get all active alerts for a user. Returns empty list if user doesn't exist."""
-    user = await session.execute(
-        select(User).where(User.telegram_id == telegram_id)
-    )
+    user = await session.execute(select(User).where(User.telegram_id == telegram_id))
     user = user.scalar_one_or_none()
 
     if not user:
@@ -152,12 +166,8 @@ async def get_all_active_alerts(telegram_id: int, session: AsyncSession):
         return None
 
     result = await session.execute(
-        select(Alert)
-        .where(
-            Alert.user_id == user.id,
-            Alert.is_active == True
-        )
-        # Сортировка от НОВЫХ к СТАРЫМ (самые свежие будут первыми в списке)
+        select(Alert).where(Alert.user_id == user.id, Alert.is_active == True)
+        # Sorting from NEW to OLD (most recent will be first in list)
         .order_by(desc(Alert.created_at))
     )
 
@@ -166,9 +176,7 @@ async def get_all_active_alerts(telegram_id: int, session: AsyncSession):
 
 # --- GET SINGLE ALERT BY ID ---
 async def get_alert_by_id(alert_id: int, session: AsyncSession) -> Alert | None:
-    result = await session.execute(
-        select(Alert).where(Alert.id == alert_id)
-    )
+    result = await session.execute(select(Alert).where(Alert.id == alert_id))
     return result.scalar_one_or_none()
 
 
@@ -197,20 +205,20 @@ async def delete_alert(alert_id: int, session: AsyncSession):
         logger.error(f"Error removing alert {alert_id} from Redis: {e}")
 
     # Delete from database (physically remove the record)
-    await session.execute(
-        delete(Alert).where(Alert.id == alert_id)
-    )
+    await session.execute(delete(Alert).where(Alert.id == alert_id))
     await session.commit()
     logger.info(f"Alert {alert_id} deleted from database.")
 
 
 # send message to user when alert is triggered
-async def send_alert_message(bot: Bot,
-                              telegram_id: int,
-                              current_price: float,
-                              symbol: str,
-                              exchange: str,
-                              target_price: float):
+async def send_alert_message(
+    bot: Bot,
+    telegram_id: int,
+    current_price: float,
+    symbol: str,
+    exchange: str,
+    target_price: float,
+):
     try:
         exchange_display = exchange.replace("_", " ").title()
 
@@ -219,7 +227,10 @@ async def send_alert_message(bot: Bot,
         direction_emoji = "📈" if direction == "ABOVE" else "📉"
 
         # Calculate percentage difference
-        percent_diff = abs(((current_price - target_price) / target_price) * 100)
+        if target_price != 0:
+            percent_diff = abs(((current_price - target_price) / target_price) * 100)
+        else:
+            percent_diff = 0  # Skip percent calculation if target is 0
 
         # Format prices
         def format_price(price: float) -> str:
@@ -239,13 +250,8 @@ async def send_alert_message(bot: Bot,
             f"✅ Target reached!"
         )
 
-        await bot.send_message(
-            chat_id=telegram_id,
-            text=message,
-            parse_mode="HTML"
-        )
+        await bot.send_message(chat_id=telegram_id, text=message, parse_mode="HTML")
 
         logger.success(f"Alert sent to {telegram_id} for {symbol} at {current_price}")
     except Exception as e:
         logger.error(f"Failed to send alert to {telegram_id}: {e}")
-

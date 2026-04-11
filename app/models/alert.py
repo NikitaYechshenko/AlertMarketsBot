@@ -13,8 +13,12 @@ class Alert(Base):
     direction = Column(String, nullable=False)  # ABOVE or BELOW
     target_price = Column(Numeric(precision=18, scale=8), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    exchange = Column(String, nullable=False) # Добавляем поле для хранения информации о бирже, на которой установлен алерт
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    exchange = Column(
+        String, nullable=False
+    )  # Add field to store exchange info where alert is set
     user = relationship("User", back_populates="alerts")
 
     def __repr__(self) -> str:

@@ -3,6 +3,7 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
+
 # 1. Create async engine
 engine = create_async_engine(
     url=settings.DATABASE_URL,
@@ -19,11 +20,16 @@ async_session_maker = async_sessionmaker(
 class Base(DeclarativeBase):
     pass
 
+
 async def init_db():
-    from app.models import user, alert  # Импортируем модели, чтобы SQLAlchemy их "увидел" и создал таблицы в БД
-    # Важно: Base.metadata.create_all сработает только для тех таблиц, 
-    # которые были импортированы/созданы ДО вызова этой функции.
-    # Так как классы написаны выше в этом же файле, SQLAlchemy их "увидит".
+    from app.models import (
+        user,
+        alert,
+    )  # Import models so SQLAlchemy "sees" them and creates tables in DB
+
+    # Important: Base.metadata.create_all will only work for tables
+    # that were imported/created BEFORE calling this function.
+    # Since classes are defined above, SQLAlchemy will "see" them.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Database was initialized!")
