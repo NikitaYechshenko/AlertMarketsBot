@@ -33,7 +33,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url> && cd Telegram_bot
+git clone https://github.com/NikitaYechshenko/AlertMarketsBot && cd Telegram_bot
 
 # 2. Set environment variables
 cp .env.example .env
