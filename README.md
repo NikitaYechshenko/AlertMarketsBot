@@ -1,19 +1,19 @@
 # 🚀 Crypto Alert Bot
 
-**Telegram bot для мониторинга цен криптовалют на Binance с мгновенными уведомлениями.**
+**Telegram bot for monitoring cryptocurrency prices on Binance with instant notifications.**
 
-📱 **Попробить:** [@AlertMarketsBot](https://t.me/AlertMarketsBot)
+📱 **Try it:** [@AlertMarketsBot](https://t.me/AlertMarketsBot)
 
-## ⚡ Что умеет
+## ⚡ Features
 
-- Цены криптовалют в реал-тайме
-- Мониторинг Binance (Spot & Futures)
-- Расширенные уведомления
-- Русский/Английский
+- Real-time cryptocurrency prices
+- Binance monitoring (Spot & Futures)
+- Advanced notifications
+- Russian/English support
 
-## 🛠️ Технологии
+## 🛠️ Technology Stack
 
-| Компонент | Технология |
+| Component | Technology |
 |-----------|-----------|
 | **Backend** | Python 3.12 + aiogram 3.26 |
 | **Database** | PostgreSQL 16 |
@@ -21,48 +21,48 @@
 | **Deploy** | Docker Compose |
 | **ORM** | SQLAlchemy 2.0 |
 
-## 🔍 Как работает
+## 🔍 How It Works
 
-1. Пользователь создаёт алерт через бота (цена X для криптовалюты Y)
-2. **Worker** в фоне мониторит цены на Binance API каждые ~5 сек
-3. Redis кэширует доступные монеты (быстро, экономит API-запросы)
-4. При срабатывании алерта → уведомление в Telegram
-5. PostgreSQL хранит пользователей и их алерты
+1. User creates an alert via the bot (price X for cryptocurrency Y)
+2. **Worker** monitors prices on Binance API in the background (~5 sec intervals)
+3. Redis caches available coins (fast, saves API requests)
+4. When an alert triggers → notification in Telegram
+5. PostgreSQL stores users and their alerts
 
-## 🚀 Быстрый старт
+## 🚀 Quick Start
 
 ```bash
-# 1. Клонирование
+# 1. Clone the repository
 git clone <repo-url> && cd Telegram_bot
 
-# 2. Переменные окружения
+# 2. Set environment variables
 cp .env.example .env
-# Вставить TELEGRAM_BOT_TOKEN от @BotFather
+# Add TELEGRAM_BOT_TOKEN from @BotFather
 
-# 3. Запуск в Docker
+# 3. Run with Docker
 docker-compose up -d --build
 
-# 4. Логи
+# 4. View logs
 docker logs -f Alert_bot_app
 ```
 
-## 📂 Структура
+## 📂 Project Structure
 
 ```
 app/
 ├── bot/              # Handlers, keyboards, FSM
-├── workers/          # Фоновые задачи мониторинга
+├── workers/          # Background monitoring tasks
 ├── exchanges/        # Binance API clients
 ├── models/           # DB models (SQLAlchemy)
 └── core/             # Config, DB, Redis
 ```
 
-## 🎮 Команды бота
+## 🎮 Bot Commands
 
-- `/start` — главное меню
-- `/menu` — вернуться в меню
-- `/cancel` — отмена
+- `/start` — main menu
+- `/menu` — return to menu
+- `/cancel` — cancel
 
 ---
 
-**Автор:** [@nikitayech](https://t.me/nikitayech)
+**Author:** [@nikitayech](https://t.me/nikitayech)
