@@ -1,6 +1,7 @@
 # 🚀 Crypto Alert Bot
 
 **Telegram bot for monitoring cryptocurrency prices on Binance with instant notifications.**
+<img width="910" height="1364" alt="image" src="https://github.com/user-attachments/assets/2b2aaa9e-bc9a-4f4b-8fe0-809b09fe3e45" />
 
 📱 **Try it:** [@AlertMarketsBot](https://t.me/AlertMarketsBot)
 
