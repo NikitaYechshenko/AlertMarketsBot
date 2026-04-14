@@ -113,7 +113,7 @@ async def binance_spot_worker(bot: Bot):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(url) as ws:
-                    logger.info("🟢 Успешно подключились к WebSocket Binance Spot!")
+                    logger.info("🟢 connected to WebSocket Binance Spot!")
 
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
@@ -147,15 +147,15 @@ async def binance_spot_worker(bot: Bot):
                                 task.add_done_callback(_log_task_exception)
 
                         elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            logger.warning("🔴 WebSocket SPOT закрыт биржей.")
+                            logger.warning("🔴 WebSocket SPOT was closed by the exchange.")
                             break
                         elif msg.type == aiohttp.WSMsgType.ERROR:
-                            logger.error("🔴 Ошибка WebSocket SPOT .")
+                            logger.error("🔴 WebSocket SPOT error.")
                             break
                         
 
         except Exception as e:
             logger.error(
-                f"⚠️ Ошибка соединения в Binance Spot Worker: {e}. Переподключение через 5 секунд..."
+                f"⚠️ Connection error in Binance Spot Worker: {e}. Reconnecting in 5 seconds..."
             )
             await asyncio.sleep(5)  # Pause before reconnection attempt

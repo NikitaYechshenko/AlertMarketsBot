@@ -1,22 +1,22 @@
 
 services:
 
-  # 1. Контейнер с PostgreSQL
+  # 1. PostgreSQL container
   db:
     image: postgres:16
     container_name: Alert_bot_db
     environment:
-      # Берем пароли из вашего .env или используем дефолтные
+      # Read credentials from .env
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
     ports:
       - "${DB_PORT}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data # Чтобы данные не удалялись при рестарте
+      - pgdata:/var/lib/postgresql/data # Persist DB data across restarts
     restart: always
 
-  # 2. Контейнер с Redis
+  # 2. Redis container
   redis:
     image: redis:alpine
     container_name: Alert_bot_redis
@@ -29,7 +29,7 @@ services:
       context: .
       dockerfile: app/Dockerfile
     container_name: Alert_bot_app
-    env_file: .env # Загружаем переменные окружения из .env
+    env_file: .env # Load environment variables from .env
     depends_on:
       - db
       - redis
@@ -37,7 +37,7 @@ services:
   
   
 
-# Объявляем том для хранения данных БД
+# Define a volume for DB data persistence
 volumes:
   pgdata:
 

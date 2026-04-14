@@ -5,9 +5,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Копируем requirements из app/ и весь код
+# Copy requirements from app/ and project code
 COPY app/requirements.txt .
-# Устанавливаем зависимости
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app . .
