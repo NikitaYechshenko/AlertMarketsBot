@@ -8,6 +8,7 @@ from aiogram import Bot
 import aiohttp
 from app.core.config import settings
 
+
 def _log_task_exception(task: asyncio.Task) -> None:
     try:
         task.result()
@@ -48,7 +49,7 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
         direction = alert_data.get("direction")
         telegram_id = alert_data.get("telegram_id")
         alert_id = alert_data.get("alert_id")
-        
+
         # Type conversion for target_price
         try:
             target_price = float(target_price) if target_price is not None else None
@@ -57,7 +58,7 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
             # Remove malformed alert from Redis to prevent infinite loop
             await redis_client.lrem(redis_key, 1, alert_str)
             continue
-            
+
         if (
             target_price is None
             or direction not in {"ABOVE", "BELOW"}
@@ -81,7 +82,7 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
             try:
                 async with async_session_maker() as session:
                     was_disabled = await disable_alert_in_db(alert_id, session)
-                
+
                 # Always send message and cleanup Redis, regardless of DB state
                 # This ensures we don't get stuck with stale Redis entries
                 try:
@@ -90,12 +91,14 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
                     )
                 except Exception as e:
                     logger.error(f"Failed to send alert message: {e}")
-                
+
                 # Always cleanup Redis (even if DB update failed or message failed)
                 await redis_client.lrem(redis_key, 1, alert_str)
-                
+
                 if not was_disabled:
-                    logger.warning(f"Alert {alert_id} was already inactive, but removed from Redis cache")
+                    logger.warning(
+                        f"Alert {alert_id} was already inactive, but removed from Redis cache"
+                    )
             except Exception as e:
                 logger.error(f"Failed to process triggered alert {alert_id}: {e}")
 
@@ -110,9 +113,7 @@ async def binance_futures_worker(bot: Bot):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(url) as ws:
-                    logger.info(
-                        "🟢 Успешно подключились к WebSocket Binance Futures!"
-                    )
+                    logger.info("🟢 Successfully connected to Binance Futures WebSocket!")
 
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
@@ -124,7 +125,10 @@ async def binance_futures_worker(bot: Bot):
                             # Binance sends a list of dictionaries.
                             if not data:
                                 logger.error("Received empty data from spot WS")
-                                await bot.send_message(chat_id=settings.CHAT_ID, text="Received empty data from spot WS")  # Replace with actual chat ID
+                                await bot.send_message(
+                                    chat_id=settings.CHAT_ID,
+                                    text="Received empty data from spot WS",
+                                )
                                 break
 
                             # Binance sends a list of dictionaries.
@@ -147,14 +151,14 @@ async def binance_futures_worker(bot: Bot):
                                 task.add_done_callback(_log_task_exception)
 
                         elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            logger.warning("🔴 WebSocket FUTURES закрыт биржей.")
+                            logger.warning("🔴 WebSocket FUTURES closed by exchange.")
                             break
                         elif msg.type == aiohttp.WSMsgType.ERROR:
-                            logger.error("🔴 Ошибка WebSocket FUTURES.")
+                            logger.error("🔴 WebSocket FUTURES error.")
                             break
 
         except Exception as e:
             logger.error(
-                f"⚠️ Ошибка соединения в Binance FUTURES Worker: {e}. Переподключение через 5 секунд..."
+                f"⚠️ Connection error in Binance FUTURES Worker: {e}. Reconnecting in 5 seconds..."
             )
             await asyncio.sleep(5)  # Pause before reconnection attempt
