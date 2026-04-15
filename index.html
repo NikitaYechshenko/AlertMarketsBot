@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>AlertMarketsBot | Free & Unlimited Crypto Price Alerts</title>
+    <meta name="title" content="AlertMarketsBot | Free & Unlimited Crypto Price Alerts">
+    <meta name="description" content="100% Free Telegram bot for crypto alerts. Monitor ~1997 Binance Spot & Futures pairs 24/7 with zero limits. Upcoming: Top 5 exchanges, NASDAQ, NYSE.">
+    <meta name="keywords" content="free crypto alerts, unlimited telegram bot, binance bot, ~1997 pairs, nasdaq bot, python aiogram, trading tracker, AlertMarketsBot">
+    
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nikitayechshenko.github.io/AlertMarketsBot/">
+    <meta property="og:title" content="AlertMarketsBot - Unlimited Crypto Alerts">
+    <meta property="og:description" content="Track ~1997 pairs for free with zero alert limits. 24/7 market monitoring directly in Telegram.">
+
+    <style>
+        :root {
+            --primary: #0088cc;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --accent: #38bdf8;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .hero {
+            text-align: center;
+            padding: 20px 0 40px;
+        }
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero p {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .highlight-tags {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .tag {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .tag-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+        .btn-group {
+            margin: 30px 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 15px 35px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 136, 204, 0.3);
+        }
+        .btn-secondary {
+            background-color: #334155;
+            color: white;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid #334155;
+        }
+        .card h3 {
+            margin-top: 0;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.4rem;
+        }
+        .list-unstyled {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .list-unstyled li {
+            margin-bottom: 12px;
+            font-size: 1.05rem;
+        }
+        .stat-box {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 15px;
+            border: 1px dashed #475569;
+            text-align: center;
+        }
+        .stat-box span {
+            display: block;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .badge {
+            background: #0f172a;
+            border: 1px solid #475569;
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #cbd5e1;
+        }
+        footer {
+            margin-top: auto;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #334155;
+            color: #64748b;
+        }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header class="hero">
+            <h1>AlertMarketsBot</h1>
+            <p>Your ultimate 24/7 market monitoring assistant right in Telegram.</p>
+            
+            <div class="highlight-tags">
+                <div class="tag">🆓 100% Free Forever</div>
+                <div class="tag">♾️ Unlimited Alerts</div>
+                <div class="tag-warning">⚡ ~5 sec latency</div>
+            </div>
+
+            <div class="btn-group">
+                <a href="https://t.me/AlertMarketsBot" class="btn btn-primary">📱 Start Trading Smarter</a>
+                <a href="https://github.com/NikitaYechshenko/AlertMarketsBot" class="btn btn-secondary">💻 Source Code</a>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <h3>ℹ️ Core Features</h3>
+                <ul class="list-unstyled">
+                    <li>✅ <b>Price alerts</b> (Set exactly what you need)</li>
+                    <li>✅ <b>Multi-exchange</b> support</li>
+                    <li>✅ <b>24/7 monitoring</b> in background</li>
+                    <li>✅ <b>Zero limits</b> on number of active alerts</li>
+                    <li>✅ Russian / English localization</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>📊 Massive Market Coverage</h3>
+                <p>We already track nearly every liquid asset on Binance:</p>
+                <ul class="list-unstyled">
+                    <li>• Binance Futures — <b>577 pairs</b></li>
+                    <li>• Binance Spot — <b>1420 pairs</b></li>
+                </ul>
+                <div class="stat-box">
+                    <span>~1997</span>
+                    Total Supported Pairs
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🚀 Roadmap (Coming Soon)</h3>
+                <ul class="list-unstyled">
+                    <li>🔜 <b>Top 5 Crypto Exchanges</b> (Bybit, OKX, Coinbase, Kraken, KuCoin)</li>
+                    <li>🔜 <b>Traditional Finance:</b> NASDAQ & NYSE stocks</li>
+                    <li>🔜 <b>Percentage (%) change</b> alerts</li>
+                    <li>🔜 <b>Price Charts</b> directly in Telegram</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>🛠️ High-Performance Stack</h3>
+                <p>Built for scale to handle thousands of requests seamlessly:</p>
+                <div class="tech-stack">
+                    <span class="badge">Python 3.12</span>
+                    <span class="badge">aiogram 3.26</span>
+                    <span class="badge">PostgreSQL 16</span>
+                    <span class="badge">Redis (Fast Cache)</span>
+                    <span class="badge">Docker Compose</span>
+                    <span class="badge">SQLAlchemy 2.0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Developed with ❤️ by <a href="https://t.me/nikitayech">@nikitayech</a> | Open Source (MIT)</p>
+    </footer>
+
+</body>
+</html>
