@@ -1,0 +1,51 @@
+
+services:
+
+  # 1. Контейнер с PostgreSQL
+  db:
+    image: postgres:16
+    container_name: Alert_bot_db
+    environment:
+      # Берем пароли из вашего .env или используем дефолтные
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Чтобы данные не удалялись при рестарте
+    restart: always
+
+  # 2. Контейнер с Redis
+  redis:
+    image: redis:alpine
+    container_name: Alert_bot_redis
+    ports:
+      - "${REDIS_PORT}:6379" # 80 for outside, 6379 inside container
+    restart: always
+  # 3. app 
+  app: 
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: Alert_bot_app
+    env_file: .env # Загружаем переменные окружения из .env
+    depends_on:
+      - db
+      - redis
+    develop:
+      watch: 
+        - action: sync
+          path: ./app
+          target: /app
+        - action: rebuild
+          path: ./app/requirements.txt
+    restart: always
+  
+  
+
+# Объявляем том для хранения данных БД
+volumes:
+  pgdata:
+
+# yaml.cheker online: https://yamlchecker.com/

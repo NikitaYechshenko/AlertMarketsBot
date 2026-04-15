@@ -5,14 +5,14 @@ from aiogram import Bot, Dispatcher
 import asyncio
 from app.core.config import settings
 from app.core.redis_db import init_redis
-# Import exchanges
-from app.exchanges.Binance.binance_spot import check_binance_spot
-from app.exchanges.Binance.binance_f import check_binance_f
+# Import exchange checkers
+from app.exchanges.Binance.binance_spot import start_binance_spot_checkers
+from app.exchanges.Binance.binance_f import start_binance_f_checkers
+# from app.exchanges.Binance.binance_f import start_binance_spot_checkers
 # Import workers
 from app.workers.Binance.spot import binance_spot_worker
 from app.workers.Binance.futures import binance_futures_worker
 
-from app.core.globals import AVAILABLE_COINS
 # Import Routers
 from app.bot.handlers.alert import alert
 # Note: user.py router is not included; user registration is handled in alert router
@@ -37,13 +37,19 @@ async def on_startup():
     await init_redis()
     logger.info("Loading active alerts from database to Redis...")
     await load_all_alerts_to_redis(async_session_maker)
-    logger.info("Fetching available coins from exchanges...")
-    AVAILABLE_COINS["binance_futures"] = set(await check_binance_f())
-    AVAILABLE_COINS["binance_spot"] = set(await check_binance_spot())
+
+    # logger.info("Fetching available coins from exchanges...")
+    # AVAILABLE_COINS["binance_futures"] = set(await check_binance_f())
+    # AVAILABLE_COINS["binance_spot"] = set(await check_binance_spot())
     # Start workers for each exchange
+    # await check_binance_f()
+
+    start_binance_spot_checkers(prices_interval_seconds=10, symbols_interval_seconds=3600)
     spot_task = asyncio.create_task(binance_spot_worker(bot))
-    futures_task = asyncio.create_task(binance_futures_worker(bot))
     spot_task.add_done_callback(_log_worker_task_failure)
+
+    start_binance_f_checkers(prices_interval_seconds=10, symbols_interval_seconds=3600)
+    futures_task = asyncio.create_task(binance_futures_worker(bot))
     futures_task.add_done_callback(_log_worker_task_failure)
     logger.info("Bot startup complete!")
 
