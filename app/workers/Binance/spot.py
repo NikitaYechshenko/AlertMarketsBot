@@ -116,15 +116,9 @@ async def binance_spot_worker(bot: Bot):
 
     while True:  # Infinite loop for auto-reconnect on errors
         try:
-<<<<<<< HEAD
-            async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(url) as ws:
-                    logger.info("🟢 connected to WebSocket Binance Spot!")
-=======
             session = get_http_session()
             async with session.ws_connect(url) as ws:
                 logger.success("🟢 BINANCE SPOT | Successfully connected to WebSocket!")
->>>>>>> dev_nikita
 
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
@@ -158,21 +152,9 @@ async def binance_spot_worker(bot: Bot):
                             )
                             task.add_done_callback(_log_task_exception)
 
-<<<<<<< HEAD
-                        elif msg.type == aiohttp.WSMsgType.CLOSED:
-                            logger.warning("🔴 WebSocket SPOT was closed by the exchange.")
-                            break
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
-                            logger.error("🔴 WebSocket SPOT error.")
-                            break
-                        
 
-        except Exception as e:
-            logger.error(
-                f"⚠️ Connection error in Binance Spot Worker: {e}. Reconnecting in 5 seconds..."
-=======
                     elif msg.type == aiohttp.WSMsgType.CLOSED:
-                        logger.warning("🔴 WebSocket SPOT closed by exchange.")
+                        logger.warning("🔴 WebSocket SPOT was closed by the exchange.")
                         break
                     elif msg.type == aiohttp.WSMsgType.ERROR:
                         logger.error("🔴 WebSocket SPOT error.")
@@ -181,6 +163,5 @@ async def binance_spot_worker(bot: Bot):
         except Exception as e:
             logger.error(
                 f"⚠️ BINANCE SPOT | error to connect Binance Spot Worker: {e}. retrying in 5 seconds..."
->>>>>>> dev_nikita
             )
             await asyncio.sleep(5)  # Pause before reconnection attempt

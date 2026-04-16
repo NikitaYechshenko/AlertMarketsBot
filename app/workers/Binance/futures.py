@@ -112,17 +112,16 @@ async def binance_futures_worker(bot: Bot):
     url = "wss://fstream.binance.com/ws/!miniTicker@arr"
     while True:  # Infinite loop for auto-reconnect on errors
         try:
-<<<<<<< HEAD
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(url) as ws:
                     logger.info(
                         "🟢 Successfully connected to Binance Futures WebSocket!"
                     )
-=======
+
             session = get_http_session()
             async with session.ws_connect(url) as ws:
                 logger.success("🟢 BINANCE FUTURES | Successfully connected to WebSocket!")
->>>>>>> dev_nikita
+
 
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
@@ -155,18 +154,18 @@ async def binance_futures_worker(bot: Bot):
                             )
                             task.add_done_callback(_log_task_exception)
 
-<<<<<<< HEAD
+
                                 # Start check without await for asyncio.create_task,
                                 # so check runs in parallel and doesn't block websocket reading
-                                task = asyncio.create_task(
+                            task = asyncio.create_task(
                                     check_alerts_for_symbol(symbol, current_price, bot)
                                 )
-                                task.add_done_callback(_log_task_exception)
+                            task.add_done_callback(_log_task_exception)
 
-                        elif msg.type == aiohttp.WSMsgType.CLOSED:
+                    elif msg.type == aiohttp.WSMsgType.CLOSED:
                             logger.warning("🔴 WebSocket FUTURES was closed by the exchange.")
                             break
-                        elif msg.type == aiohttp.WSMsgType.ERROR:
+                    elif msg.type == aiohttp.WSMsgType.ERROR:
                             logger.error("🔴 WebSocket FUTURES error.")
                             break
 
@@ -184,13 +183,6 @@ async def binance_futures_worker(bot: Bot):
         except Exception as e:
             logger.error(
                 f"⚠️ BINANCE FUTURES | Connection error in Binance FUTURES Worker: {e}. Reconnecting in 5 seconds..."
->>>>>>> dev_nikita
+
             )
             await asyncio.sleep(5)  # Pause before reconnection attempt
-
-
-async def check_binance_futures_api():
-    """
-    Periodic task to check Binance Futures API availability.
-    """
-    url =     url = "wss://fstream.binance.com/ws/!miniTicker@arr"
