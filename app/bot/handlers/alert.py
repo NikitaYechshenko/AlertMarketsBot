@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, LinkPreviewOptions, Message
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -663,6 +663,8 @@ async def show_about(callback: CallbackQuery):
     await callback.message.edit_text(
         t("about", lang, exchanges=exchanges_text, total_pairs=total_pairs),
         reply_markup=get_about_keyboard(lang),
-        parse_mode="HTML"
+        parse_mode="HTML",
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
+        disable_web_page_preview=True ,
     )
     await callback.answer()

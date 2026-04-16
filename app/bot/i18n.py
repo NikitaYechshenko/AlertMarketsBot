@@ -135,7 +135,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "{exchanges}\n"
             "Всего: ~{total_pairs} пар\n\n"
             "<b>Скоро:</b> NASDAQ, NYSE\n\n"
-            "Создатель: @nikitayech"
+            "Создатель: @nikitayech\n"
+            "github: https://github.com/NikitaYechshenko/AlertMarketsBot"
         ),
 
         # Cancel
@@ -284,7 +285,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "{exchanges}\n"
             "Total: ~{total_pairs} pairs\n\n"
             "<b>Coming:</b> NASDAQ, NYSE\n\n"
-            "Created by @nikitayech"
+            "Created by @nikitayech\n"
+            "github: https://github.com/NikitaYechshenko/AlertMarketsBot"
         ),
 
         # Cancel

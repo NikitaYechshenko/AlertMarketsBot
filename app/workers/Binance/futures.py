@@ -7,6 +7,8 @@ import asyncio
 from aiogram import Bot
 import aiohttp
 from app.core.config import settings
+from app.core.http_client import get_http_session
+
 
 def _log_task_exception(task: asyncio.Task) -> None:
     try:
@@ -48,7 +50,7 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
         direction = alert_data.get("direction")
         telegram_id = alert_data.get("telegram_id")
         alert_id = alert_data.get("alert_id")
-        
+
         # Type conversion for target_price
         try:
             target_price = float(target_price) if target_price is not None else None
@@ -57,7 +59,7 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
             # Remove malformed alert from Redis to prevent infinite loop
             await redis_client.lrem(redis_key, 1, alert_str)
             continue
-            
+
         if (
             target_price is None
             or direction not in {"ABOVE", "BELOW"}
@@ -81,7 +83,7 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
             try:
                 async with async_session_maker() as session:
                     was_disabled = await disable_alert_in_db(alert_id, session)
-                
+
                 # Always send message and cleanup Redis, regardless of DB state
                 # This ensures we don't get stuck with stale Redis entries
                 try:
@@ -90,12 +92,14 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
                     )
                 except Exception as e:
                     logger.error(f"Failed to send alert message: {e}")
-                
+
                 # Always cleanup Redis (even if DB update failed or message failed)
                 await redis_client.lrem(redis_key, 1, alert_str)
-                
+
                 if not was_disabled:
-                    logger.warning(f"Alert {alert_id} was already inactive, but removed from Redis cache")
+                    logger.warning(
+                        f"Alert {alert_id} was already inactive, but removed from Redis cache"
+                    )
             except Exception as e:
                 logger.error(f"Failed to process triggered alert {alert_id}: {e}")
 
@@ -108,37 +112,50 @@ async def binance_futures_worker(bot: Bot):
     url = "wss://fstream.binance.com/ws/!miniTicker@arr"
     while True:  # Infinite loop for auto-reconnect on errors
         try:
+<<<<<<< HEAD
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(url) as ws:
                     logger.info(
                         "🟢 Successfully connected to Binance Futures WebSocket!"
                     )
+=======
+            session = get_http_session()
+            async with session.ws_connect(url) as ws:
+                logger.success("🟢 BINANCE FUTURES | Successfully connected to WebSocket!")
+>>>>>>> dev_nikita
 
-                    async for msg in ws:
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            try:
-                                data = json.loads(msg.data)
-                            except json.JSONDecodeError as e:
-                                logger.error(f"Invalid futures WS JSON: {e}")
+                async for msg in ws:
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        try:
+                            data = json.loads(msg.data)
+                        except json.JSONDecodeError as e:
+                            logger.error(f"BINANCE FUTURES | Invalid futures WS JSON: {e}")
+                            continue
+                        # Binance sends a list of dictionaries.
+                        if not data:
+                            logger.error("BINANCE FUTURES | Received empty data from futures WS")
+                            break
+
+                        # Binance sends a list of dictionaries.
+                        # 's' - symbol (BTCUSDT), 'c' - current close price
+                        for item in data:
+                            symbol = item.get("s")
+                            raw_price = item.get("c")
+                            if symbol is None or raw_price is None:
                                 continue
-                            # Binance sends a list of dictionaries.
-                            if not data:
-                                logger.error("Received empty data from spot WS")
-                                await bot.send_message(chat_id=settings.CHAT_ID, text="Received empty data from spot WS")  # Replace with actual chat ID
-                                break
+                            try:
+                                current_price = float(raw_price)
+                            except (TypeError, ValueError):
+                                continue
 
-                            # Binance sends a list of dictionaries.
-                            # 's' - symbol (BTCUSDT), 'c' - current close price
-                            for item in data:
-                                symbol = item.get("s")
-                                raw_price = item.get("c")
-                                if symbol is None or raw_price is None:
-                                    continue
-                                try:
-                                    current_price = float(raw_price)
-                                except (TypeError, ValueError):
-                                    continue
+                            # Start check without await for asyncio.create_task,
+                            # so check runs in parallel and doesn't block websocket reading
+                            task = asyncio.create_task(
+                                check_alerts_for_symbol(symbol, current_price, bot)
+                            )
+                            task.add_done_callback(_log_task_exception)
 
+<<<<<<< HEAD
                                 # Start check without await for asyncio.create_task,
                                 # so check runs in parallel and doesn't block websocket reading
                                 task = asyncio.create_task(
@@ -156,6 +173,18 @@ async def binance_futures_worker(bot: Bot):
         except Exception as e:
             logger.error(
                 f"⚠️ Connection error in Binance FUTURES Worker: {e}. Reconnecting in 5 seconds..."
+=======
+                    elif msg.type == aiohttp.WSMsgType.CLOSED:
+                        logger.warning("🔴 BINANCE FUTURES | WebSocket FUTURES closed by exchange.")
+                        break
+                    elif msg.type == aiohttp.WSMsgType.ERROR:
+                        logger.error("🔴 BINANCE FUTURES | WebSocket FUTURES error.")
+                        break
+
+        except Exception as e:
+            logger.error(
+                f"⚠️ BINANCE FUTURES | Connection error in Binance FUTURES Worker: {e}. Reconnecting in 5 seconds..."
+>>>>>>> dev_nikita
             )
             await asyncio.sleep(5)  # Pause before reconnection attempt
 
