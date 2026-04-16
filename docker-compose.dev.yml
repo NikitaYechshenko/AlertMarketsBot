@@ -33,13 +33,13 @@ services:
     depends_on:
       - db
       - redis
-    develop:
-      watch: 
-        - action: sync
-          path: ./app
-          target: /app
-        - action: rebuild
-          path: ./app/requirements.txt
+    # develop:
+    #   watch: 
+    #     - action: sync
+    #       path: ./app
+    #       target: /app
+    #     - action: rebuild
+    #       path: ./app/requirements.txt
     restart: always
   
   

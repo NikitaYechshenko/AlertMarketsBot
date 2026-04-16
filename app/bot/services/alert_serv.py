@@ -1,12 +1,21 @@
 import json
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.globals import AVAILABLE_COINS, PRICE_FETCHERS
+from app.core.globals import AVAILABLE_COINS, URLS
 from app.core.redis_db import redis_client
+from app.core.http_client import get_http_session
 from app.models.alert import Alert
 from sqlalchemy import desc, update, delete, select
 from aiogram import Bot
 from app.models.user import User
+from app.exchanges.Binance.binance_spot import get_binance_current_spot_price
+from app.exchanges.Binance.binance_f import get_binance_current_f_price
+from aiogram.types import LinkPreviewOptions
+
+PRICE_FETCHERS = {
+    "binance_spot": get_binance_current_spot_price,
+    "binance_futures": get_binance_current_f_price,
+}
 
 
 # 1. Search where the asset is traded
@@ -30,7 +39,7 @@ async def get_current_price(symbol: str, exchange: str) -> float:
     fetch_func = PRICE_FETCHERS.get(exchange)
     if not fetch_func:
         raise ValueError(f"Unknown exchange: {exchange}")
-    return await fetch_func(symbol)
+    return await fetch_func(get_http_session(), symbol)
 
 
 # 3. Save alert to PostgreSQL
@@ -130,7 +139,7 @@ async def load_all_alerts_to_redis(session_maker):
                     continue
 
             logger.success(
-                f"Loaded {loaded_count} active alerts from database to Redis"
+                f"REDIS | Loaded {loaded_count} active alerts from database to REDIS"
             )
     except Exception as e:
         logger.error(f"Error loading alerts from database to Redis: {e}")
@@ -220,11 +229,8 @@ async def send_alert_message(
     target_price: float,
 ):
     try:
+        
         exchange_display = exchange.replace("_", " ").title()
-
-        # Determine direction based on prices
-        direction = "ABOVE" if current_price >= target_price else "BELOW"
-        direction_emoji = "📈" if direction == "ABOVE" else "📉"
 
         # Calculate percentage difference
         if target_price != 0:
@@ -240,17 +246,27 @@ async def send_alert_message(
                 return f"{price:.4f}"
             else:
                 return f"{price:.8f}"
+            
+        #"binance_spot": "https://api.binance.com/api/v3/ticker/price?symbol={symbol}",
+        url = URLS.get(exchange)
+        url = url.format(symbol=symbol)
 
         message = (
-            f"🚨 <b>ALERT!</b>\n\n"
-            f"<b>{symbol}</b> • {exchange_display}\n"
-            f"Target: <code>${format_price(target_price)}</code>\n"
-            f"Current: <code>${format_price(current_price)}</code>\n"
-            f"{direction_emoji} {direction.lower()} | {percent_diff:.2f}%\n\n"
-            f"✅ Target reached!"
+            f"🚨 <b>ALERT!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"<b>{symbol}</b> • {exchange_display}\n\n"
+            f"🎯 Target: <code>${format_price(target_price)}</code>\n"
+            f"{'📈' if current_price >= target_price else '📉'} Current: <code>${format_price(current_price)}</code>\n\n"
+            f"🔗 <a href='{url}'>View on {exchange_display}</a>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ <b>Target reached!</b>"
         )
 
-        await bot.send_message(chat_id=telegram_id, text=message, parse_mode="HTML")
+        await bot.send_message(chat_id=telegram_id,
+                                text=message,
+                                parse_mode="HTML", 
+                               disable_web_page_preview=True,
+                               link_preview_options=LinkPreviewOptions(is_disabled=True))
 
         logger.success(f"Alert sent to {telegram_id} for {symbol} at {current_price}")
     except Exception as e:

@@ -1,3 +1,5 @@
+import sys
+
 from loguru import logger
 from app.bot.middlewares.db import DbSessionMiddleware
 from app.core.database import async_session_maker, init_db
@@ -5,9 +7,12 @@ from aiogram import Bot, Dispatcher
 import asyncio
 from app.core.config import settings
 from app.core.redis_db import init_redis
+from app.core.http_client import init_http_session, close_http_session
+
 # Import exchange checkers
 from app.exchanges.Binance.binance_spot import start_binance_spot_checkers
 from app.exchanges.Binance.binance_f import start_binance_f_checkers
+
 # from app.exchanges.Binance.binance_f import start_binance_spot_checkers
 # Import workers
 from app.workers.Binance.spot import binance_spot_worker
@@ -15,15 +20,24 @@ from app.workers.Binance.futures import binance_futures_worker
 
 # Import Routers
 from app.bot.handlers.alert import alert
+
 # Note: user.py router is not included; user registration is handled in alert router
 # Import alert services
 from app.bot.services.alert_serv import load_all_alerts_to_redis
 
 
+logger.remove()  # Remove default logger
+logger.add(
+    sys.stderr,
+    # Формат: Время (только ЧЧ:ММ:СС) | Уровень (первая буква) | Модуль:Функция - Сообщение
+    format="<green>{time:HH:mm:ss}</green> | <level>{level: <5}</level> | <cyan>{module}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>",
+    level="INFO",
+)
+
 bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
 
-
+# glo
 def _log_worker_task_failure(task: asyncio.Task) -> None:
     try:
         task.result()
@@ -33,30 +47,31 @@ def _log_worker_task_failure(task: asyncio.Task) -> None:
 
 async def on_startup():
     logger.info("Bot is starting up...")
-    logger.info("Initializing redis...")
+    await init_http_session()
     await init_redis()
-    logger.info("Loading active alerts from database to Redis...")
     await load_all_alerts_to_redis(async_session_maker)
 
-    # logger.info("Fetching available coins from exchanges...")
-    # AVAILABLE_COINS["binance_futures"] = set(await check_binance_f())
-    # AVAILABLE_COINS["binance_spot"] = set(await check_binance_spot())
-    # Start workers for each exchange
-    # await check_binance_f()
-
-    start_binance_spot_checkers(prices_interval_seconds=10, symbols_interval_seconds=3600)
+    # Binance SPOT
+    start_binance_spot_checkers(prices_interval_seconds=300, symbols_interval_seconds=86400)
     spot_task = asyncio.create_task(binance_spot_worker(bot))
     spot_task.add_done_callback(_log_worker_task_failure)
 
-    start_binance_f_checkers(prices_interval_seconds=10, symbols_interval_seconds=3600)
+    # Binance FUTURES
+    start_binance_f_checkers(prices_interval_seconds=300, symbols_interval_seconds=86400)
     futures_task = asyncio.create_task(binance_futures_worker(bot))
     futures_task.add_done_callback(_log_worker_task_failure)
     logger.info("Bot startup complete!")
 
 
+async def on_shutdown():
+    logger.info("Shutting down shared HTTP client...")
+    await close_http_session()
+
+
 async def main():
     await init_db()
     dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
 
     # Register middleware for messages
     dp.message.middleware(DbSessionMiddleware(session_pool=async_session_maker))
