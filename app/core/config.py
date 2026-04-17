@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     # Telegram
     TELEGRAM_BOT_TOKEN: str
     CHAT_ID: int
+
+    # Workers optimization
+    ALERTS_NO_ALERTS_TTL_SECONDS: float = 1.5
+    ALERTS_MAX_CONCURRENT_CHECKS: int = 200
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

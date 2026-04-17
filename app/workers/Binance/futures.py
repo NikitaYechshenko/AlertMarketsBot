@@ -4,10 +4,17 @@ from app.core.database import async_session_maker
 from loguru import logger
 import json
 import asyncio
+from functools import partial
+from time import monotonic
 from aiogram import Bot
 import aiohttp
 from app.core.config import settings
 from app.core.http_client import get_http_session
+
+
+_no_alerts_cache_until: dict[str, float] = {}
+_inflight_symbols: set[str] = set()
+_alert_check_semaphore = asyncio.Semaphore(settings.ALERTS_MAX_CONCURRENT_CHECKS)
 
 
 def _log_task_exception(task: asyncio.Task) -> None:
@@ -17,6 +24,18 @@ def _log_task_exception(task: asyncio.Task) -> None:
         logger.error(f"Alert check task failed: {e}")
 
 
+def _release_symbol_and_log_error(task: asyncio.Task, symbol: str) -> None:
+    _inflight_symbols.discard(symbol)
+    _log_task_exception(task)
+
+
+async def _bounded_check_alerts_for_symbol(
+    symbol: str, current_price: float, bot: Bot
+) -> None:
+    async with _alert_check_semaphore:
+        await check_alerts_for_symbol(symbol, current_price, bot)
+
+
 async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
     """
     Check if there are any triggered alerts for a specific coin.
@@ -24,12 +43,23 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
     exchange = "binance_futures"
     redis_key = f"alerts:{exchange}:{symbol}"
 
+    # Short TTL cache prevents constant Redis lookups for symbols without alerts.
+    now = monotonic()
+    cached_until = _no_alerts_cache_until.get(symbol)
+    if cached_until is not None and cached_until > now:
+        return
+
     # Get all alerts for this coin from Redis list
     # lrange returns empty list [] if no alerts for this coin
     alerts = await redis_client.lrange(redis_key, 0, -1)
 
     if not alerts:
+        _no_alerts_cache_until[symbol] = (
+            now + settings.ALERTS_NO_ALERTS_TTL_SECONDS
+        )
         return  # If no alerts, exit early (save resources)
+
+    _no_alerts_cache_until.pop(symbol, None)
 
     for alert_str in alerts:
         if isinstance(alert_str, bytes):
@@ -141,12 +171,20 @@ async def binance_futures_worker(bot: Bot):
                             except (TypeError, ValueError):
                                 continue
 
+                            if symbol in _inflight_symbols:
+                                continue
+                            _inflight_symbols.add(symbol)
+
                             # Start check without await for asyncio.create_task,
                             # so check runs in parallel and doesn't block websocket reading
                             task = asyncio.create_task(
-                                check_alerts_for_symbol(symbol, current_price, bot)
+                                _bounded_check_alerts_for_symbol(
+                                    symbol, current_price, bot
+                                )
                             )
-                            task.add_done_callback(_log_task_exception)
+                            task.add_done_callback(
+                                partial(_release_symbol_and_log_error, symbol=symbol)
+                            )
 
                     elif msg.type == aiohttp.WSMsgType.CLOSED:
                         logger.warning("🔴 WebSocket FUTURES was closed by the exchange.")
