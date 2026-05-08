@@ -1,39 +1,37 @@
 import asyncio
-from loguru import logger
-# Импортируй свои функции (укажи правильные пути)
-from app.core.http_client import init_http_session, close_http_session, get_http_session
-# Импортируй ту функцию, которая делает сам запрос (внутри _loop_binance_f_check_prices)
-# Допустим, она называется get_binance_current_f_price
+import websockets
+import json
+from datetime import datetime
 
-async def quick_check():
-    # 1. Заводим сессию
-    await init_http_session()
-    session = get_http_session()
+async def binance_all_tickers():
+    # Актуальный эндпоинт после обновления 2026 года
+    url = "wss://fstream.binance.com/market/ws/!miniTicker@arr"
     
-    logger.info("Пробую отправить тестовый запрос к Binance...")
-    
-    try:
-        # 2. Делаем одиночный запрос цены
-        # Замени на свою реальную функцию запроса
-        # Если ее нет под рукой, можно протестировать через прямой запрос:
-        async def fetch_direct():
-            url = "https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"
-            async with session.get(url) as resp:
-                return resp.status, await resp.json()
-
-        status, data = await fetch_direct()
-        
-        if status == 200:
-            logger.success(f"Успех! Статус: {status}, Данные: {data}")
-        else:
-            logger.error(f"Binance ответил ошибкой: {status}, Тело: {data}")
-
-    except Exception as e:
-        logger.exception(f"Запрос не удался. Ошибка: {e}")
-    
-    finally:
-        # 3. Закрываем сессию
-        await close_http_session()
+    while True:
+        try:
+            print(f"[{datetime.now()}] Подключение к Binance...")
+            async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+                print("Соединение установлено. Получаю данные по всем монетам...")
+                
+                while True:
+                    data = await ws.recv()
+                    tickers = json.loads(data)
+                    
+                    # tickers — это список словарей для каждой монеты
+                    # Выведем количество монет и цену BTC для проверки
+                    btc = next((item for item in tickers if item["s"] == "BTCUSDT"), None)
+                    
+                    print(f"Обновлено монет: {len(tickers)} | BTC: {btc['c'] if btc else 'N/A'}")
+                    
+        except websockets.exceptions.ConnectionClosed:
+            print("Соединение разорвано. Повторное подключение через 5 секунд...")
+            await asyncio.sleep(5)
+        except Exception as e:
+            print(f"Ошибка: {e}")
+            await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    asyncio.run(quick_check())
+    try:
+        asyncio.run(binance_all_tickers())
+    except KeyboardInterrupt:
+        print("\nОстановлено пользователем.")

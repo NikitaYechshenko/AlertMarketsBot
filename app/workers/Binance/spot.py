@@ -141,15 +141,21 @@ async def binance_spot_worker(bot: Bot):
     """
     # Endpoint for all tickers stream (All Market Tickers Stream)
     url = "wss://stream.binance.com/ws/!miniTicker@arr"
+    reconnect_delay = 5
+    max_reconnect_delay = 60
+    message_count = 0
 
     while True:  # Infinite loop for auto-reconnect on errors
         try:
             session = get_http_session()
             async with session.ws_connect(url) as ws:
                 logger.success("🟢 BINANCE SPOT | Successfully connected to WebSocket!")
+                reconnect_delay = 5
+                message_count = 0
 
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
+                        message_count += 1
                         try:
                             data = json.loads(msg.data)
                         except json.JSONDecodeError as e:
@@ -159,8 +165,14 @@ async def binance_spot_worker(bot: Bot):
                         if not data:
                             # Skip empty data instead of breaking - normal network condition
                             continue
+                        
+                        # Log every Nth message to show stream is active
+                        if message_count % 100 == 0:
+                            logger.info(f"📊 BINANCE SPOT | Received {message_count} messages, {len(_inflight_symbols)} symbols in flight")
+
                         # Binance sends a list of dictionaries.
                         # 's' - symbol (BTCUSDT), 'c' - current close price
+                        symbols_processed = 0
                         for item in data:
                             symbol = item.get("s")
                             raw_price = item.get("c")
@@ -170,6 +182,8 @@ async def binance_spot_worker(bot: Bot):
                                 current_price = float(raw_price)
                             except (TypeError, ValueError):
                                 continue
+
+                            symbols_processed += 1
 
                             if symbol in _inflight_symbols:
                                 continue
@@ -185,17 +199,28 @@ async def binance_spot_worker(bot: Bot):
                             task.add_done_callback(
                                 partial(_release_symbol_and_log_error, symbol=symbol)
                             )
+                        
+                        # Debug: Log first few price updates
+                        if message_count <= 5:
+                            logger.debug(f"BINANCE SPOT | Processed {symbols_processed} symbols in message #{message_count}")
 
 
                     elif msg.type == aiohttp.WSMsgType.CLOSED:
-                        logger.warning("🔴 WebSocket SPOT was closed by the exchange.")
+                        logger.warning(f"🔴 WebSocket SPOT was closed by the exchange. Code: {msg.data}, Message: {msg.extra}")
                         break
                     elif msg.type == aiohttp.WSMsgType.ERROR:
-                        logger.error("🔴 WebSocket SPOT error.")
+                        logger.error(f"🔴 WebSocket SPOT error: {msg}")
                         break
 
+        except asyncio.TimeoutError as e:
+            logger.error(
+                f"⚠️ BINANCE SPOT | Connection timeout: {e}. Reconnecting in {reconnect_delay}s..."
+            )
+            await asyncio.sleep(reconnect_delay)
+            reconnect_delay = min(reconnect_delay * 1.5, max_reconnect_delay)
         except Exception as e:
             logger.error(
-                f"⚠️ BINANCE SPOT | error to connect Binance Spot Worker: {e}. retrying in 5 seconds..."
+                f"⚠️ BINANCE SPOT | error to connect: {type(e).__name__}: {e}. Retrying in {reconnect_delay}s..."
             )
-            await asyncio.sleep(5)  # Pause before reconnection attempt
+            await asyncio.sleep(reconnect_delay)
+            reconnect_delay = min(reconnect_delay * 1.5, max_reconnect_delay)

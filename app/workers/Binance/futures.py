@@ -7,9 +7,8 @@ import asyncio
 from functools import partial
 from time import monotonic
 from aiogram import Bot
-import aiohttp
+import websockets
 from app.core.config import settings
-from app.core.http_client import get_http_session
 
 
 _no_alerts_cache_until: dict[str, float] = {}
@@ -137,79 +136,77 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
 async def binance_futures_worker(bot: Bot):
     """
     Background process that maintains WebSocket connection with Binance Futures.
-    Includes keep-alive mechanism to prevent timeout disconnections.
+    Uses the same websockets-based connection pattern as the working test script.
     """
-    # Endpoint for all tickers stream (All Market Tickers Stream)
-    url = "wss://fstream.binance.com/ws/!miniTicker@arr"
-    reconnect_delay = 5  # Start with 5 second delay
-    max_reconnect_delay = 60  # Cap at 60 seconds
-    
-    while True:  # Infinite loop for auto-reconnect on errors
+    url = "wss://fstream.binance.com/market/ws/!miniTicker@arr"
+
+    while True:
         try:
-            session = get_http_session()
-            async with session.ws_connect(url) as ws:
+            logger.info("🟡 BINANCE FUTURES | Connecting to WebSocket...")
+            async with websockets.connect(
+                url,
+                ping_interval=20,
+                ping_timeout=20,
+            ) as ws:
                 logger.success("🟢 BINANCE FUTURES | Successfully connected to WebSocket!")
-                reconnect_delay = 5  # Reset delay on successful connection
-                last_message_time = asyncio.get_event_loop().time()
 
-                async for msg in ws:
-                    if msg.type == aiohttp.WSMsgType.TEXT:
-                        last_message_time = asyncio.get_event_loop().time()  # Update last message timestamp
+                message_count = 0
+
+                while True:
+                    data = await ws.recv()
+                    message_count += 1
+
+                    try:
+                        tickers = json.loads(data)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"BINANCE FUTURES | Invalid futures WS JSON: {e}")
+                        continue
+
+                    if not tickers:
+                        continue
+
+                    if message_count % 100 == 0:
+                        logger.info(
+                            f"📊 BINANCE FUTURES | Received {message_count} messages, {len(_inflight_symbols)} symbols in flight"
+                        )
+
+                    symbols_processed = 0
+                    for item in tickers:
+                        symbol = item.get("s")
+                        raw_price = item.get("c")
+                        if symbol is None or raw_price is None:
+                            continue
                         try:
-                            data = json.loads(msg.data)
-                        except json.JSONDecodeError as e:
-                            logger.error(f"BINANCE FUTURES | Invalid futures WS JSON: {e}")
+                            current_price = float(raw_price)
+                        except (TypeError, ValueError):
                             continue
 
-                        # Binance sends a list of dictionaries.
-                        if not data:
-                            # Skip empty data instead of breaking - normal condition
+                        symbols_processed += 1
+
+                        if symbol in _inflight_symbols:
                             continue
+                        _inflight_symbols.add(symbol)
 
-                        # Binance sends a list of dictionaries.
-                        # 's' - symbol (BTCUSDT), 'c' - current close price
-                        for item in data:
-                            symbol = item.get("s")
-                            raw_price = item.get("c")
-                            if symbol is None or raw_price is None:
-                                continue
-                            try:
-                                current_price = float(raw_price)
-                            except (TypeError, ValueError):
-                                continue
+                        task = asyncio.create_task(
+                            _bounded_check_alerts_for_symbol(symbol, current_price, bot)
+                        )
+                        task.add_done_callback(
+                            partial(_release_symbol_and_log_error, symbol=symbol)
+                        )
 
-                            if symbol in _inflight_symbols:
-                                continue
-                            _inflight_symbols.add(symbol)
+                    if message_count <= 5:
+                        logger.debug(
+                            f"BINANCE FUTURES | Processed {symbols_processed} symbols in message #{message_count}"
+                        )
 
-                            # Start check without await for asyncio.create_task,
-                            # so check runs in parallel and doesn't block websocket reading
-                            task = asyncio.create_task(
-                                _bounded_check_alerts_for_symbol(
-                                    symbol, current_price, bot
-                                )
-                            )
-                            task.add_done_callback(
-                                partial(_release_symbol_and_log_error, symbol=symbol)
-                            )
-
-                    elif msg.type == aiohttp.WSMsgType.CLOSED:
-                        logger.warning("🔴 WebSocket FUTURES was closed by the exchange. Code: {msg.data}, Message: {msg.extra}")
-                        break
-                    elif msg.type == aiohttp.WSMsgType.ERROR:
-                        logger.error(f"🔴 WebSocket FUTURES error: {msg}")
-                        break
-
-        except asyncio.TimeoutError as e:
-            logger.error(
-                f"⚠️ BINANCE FUTURES | Connection timeout: {e}. Reconnecting in {reconnect_delay}s..."
+        except websockets.exceptions.ConnectionClosed as e:
+            logger.warning(
+                f"🔴 BINANCE FUTURES | WebSocket closed: code={e.code}, reason={e.reason}. Reconnecting in 5 seconds..."
             )
-            await asyncio.sleep(reconnect_delay)
-            reconnect_delay = min(reconnect_delay * 1.5, max_reconnect_delay)  # Exponential backoff
+            await asyncio.sleep(5)
         except Exception as e:
             logger.error(
-                f"⚠️ BINANCE FUTURES | Connection error: {type(e).__name__}: {e}. Reconnecting in {reconnect_delay}s..."
+                f"⚠️ BINANCE FUTURES | Connection error: {type(e).__name__}: {e}. Reconnecting in 5 seconds..."
             )
-            await asyncio.sleep(reconnect_delay)
-            reconnect_delay = min(reconnect_delay * 1.5, max_reconnect_delay)  # Exponential backoff
+            await asyncio.sleep(5)
 
