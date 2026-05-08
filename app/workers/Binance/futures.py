@@ -137,17 +137,24 @@ async def check_alerts_for_symbol(symbol: str, current_price: float, bot: Bot):
 async def binance_futures_worker(bot: Bot):
     """
     Background process that maintains WebSocket connection with Binance Futures.
+    Includes keep-alive mechanism to prevent timeout disconnections.
     """
     # Endpoint for all tickers stream (All Market Tickers Stream)
     url = "wss://fstream.binance.com/ws/!miniTicker@arr"
+    reconnect_delay = 5  # Start with 5 second delay
+    max_reconnect_delay = 60  # Cap at 60 seconds
+    
     while True:  # Infinite loop for auto-reconnect on errors
         try:
             session = get_http_session()
             async with session.ws_connect(url) as ws:
                 logger.success("🟢 BINANCE FUTURES | Successfully connected to WebSocket!")
+                reconnect_delay = 5  # Reset delay on successful connection
+                last_message_time = asyncio.get_event_loop().time()
 
                 async for msg in ws:
                     if msg.type == aiohttp.WSMsgType.TEXT:
+                        last_message_time = asyncio.get_event_loop().time()  # Update last message timestamp
                         try:
                             data = json.loads(msg.data)
                         except json.JSONDecodeError as e:
@@ -156,8 +163,8 @@ async def binance_futures_worker(bot: Bot):
 
                         # Binance sends a list of dictionaries.
                         if not data:
-                            logger.error("BINANCE FUTURES | Received empty data from futures WS")
-                            break
+                            # Skip empty data instead of breaking - normal condition
+                            continue
 
                         # Binance sends a list of dictionaries.
                         # 's' - symbol (BTCUSDT), 'c' - current close price
@@ -187,15 +194,22 @@ async def binance_futures_worker(bot: Bot):
                             )
 
                     elif msg.type == aiohttp.WSMsgType.CLOSED:
-                        logger.warning("🔴 WebSocket FUTURES was closed by the exchange.")
+                        logger.warning("🔴 WebSocket FUTURES was closed by the exchange. Code: {msg.data}, Message: {msg.extra}")
                         break
                     elif msg.type == aiohttp.WSMsgType.ERROR:
-                        logger.error("🔴 WebSocket FUTURES error.")
+                        logger.error(f"🔴 WebSocket FUTURES error: {msg}")
                         break
 
+        except asyncio.TimeoutError as e:
+            logger.error(
+                f"⚠️ BINANCE FUTURES | Connection timeout: {e}. Reconnecting in {reconnect_delay}s..."
+            )
+            await asyncio.sleep(reconnect_delay)
+            reconnect_delay = min(reconnect_delay * 1.5, max_reconnect_delay)  # Exponential backoff
         except Exception as e:
             logger.error(
-                f"⚠️ BINANCE FUTURES | Connection error in Binance FUTURES Worker: {e}. Reconnecting in 5 seconds..."
+                f"⚠️ BINANCE FUTURES | Connection error: {type(e).__name__}: {e}. Reconnecting in {reconnect_delay}s..."
             )
-            await asyncio.sleep(5)  # Pause before reconnection attempt
+            await asyncio.sleep(reconnect_delay)
+            reconnect_delay = min(reconnect_delay * 1.5, max_reconnect_delay)  # Exponential backoff
 

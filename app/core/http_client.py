@@ -14,7 +14,8 @@ async def init_http_session() -> aiohttp.ClientSession:
     if _session is not None and not _session.closed:
         return _session
 
-    timeout = aiohttp.ClientTimeout(total=30, connect=10, sock_read=20)
+    # Increased sock_read timeout for WebSocket connections (Binance may have long gaps between messages)
+    timeout = aiohttp.ClientTimeout(total=120, connect=10, sock_read=60)
     connector = aiohttp.TCPConnector(
         family=socket.AF_INET,
         use_dns_cache=True,
@@ -23,7 +24,7 @@ async def init_http_session() -> aiohttp.ClientSession:
         limit_per_host=30,
     )
     _session = aiohttp.ClientSession(timeout=timeout, connector=connector)
-    logger.info("HTTP session initialized with custom settings.")
+    logger.info("HTTP session initialized with custom settings (sock_read=60s for WebSocket stability).")
     return _session
 
 

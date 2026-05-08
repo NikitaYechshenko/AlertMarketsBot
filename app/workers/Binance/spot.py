@@ -157,10 +157,8 @@ async def binance_spot_worker(bot: Bot):
                             continue
                         # Binance sends a list of dictionaries.
                         if not data:
-                            logger.error(
-                                "BINANCE SPOT | Received empty data from spot WS"
-                            )
-                            break
+                            # Skip empty data instead of breaking - normal network condition
+                            continue
                         # Binance sends a list of dictionaries.
                         # 's' - symbol (BTCUSDT), 'c' - current close price
                         for item in data:
